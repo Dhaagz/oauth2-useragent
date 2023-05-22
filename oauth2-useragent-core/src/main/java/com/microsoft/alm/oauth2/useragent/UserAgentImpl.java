@@ -43,6 +43,11 @@ public class UserAgentImpl implements UserAgent, ProviderScanner {
     static final String NEW_LINE = System.getProperty("line.separator");
     static final String UTF_8 = "UTF-8";
     static final String USER_AGENT_PROVIDER_PROPERTY_NAME = "userAgentProvider";
+    static final String OKTA_PROXY_HOST_PROPERTY_NAME = "okta.proxyHost";
+    static final String OKTA_PROXY_PORT_PROPERTY_NAME = "okta.proxyPort";
+
+    static final String[] PROXY_HOST_PROPS = {"http.proxyHost", "https.proxyHost"};
+    static final String[] PROXY_PORT_PROPS = {"http.proxyPort", "https.proxyPort"};
 
     private static final String[] EMPTY_STRING_ARRAY = new String[0];
     private static final Set<String> NETWORKING_PROPERTY_NAMES;
@@ -169,6 +174,7 @@ public class UserAgentImpl implements UserAgent, ProviderScanner {
         provider.augmentProcessParameters(command, classPath);
 
         relayProperties(System.getProperties(), NETWORKING_PROPERTY_NAMES, command);
+        relayOktaProxyProperties(command);
 
         // Locate our class to add it to the classPath
         final PackageLocator locator = new PackageLocator();
@@ -199,6 +205,32 @@ public class UserAgentImpl implements UserAgent, ProviderScanner {
         }
         catch (final InterruptedException e) {
             throw new AuthorizationException("interrupted_exception", e.getMessage(), null, e);
+        }
+    }
+
+    /**
+     * Add proxy options to command line from okta proxy properties okta.proxyHost and okta.proxyPort.<br/>
+     * This allows setting a proxy for the okta auth pop-up only without using the global java properties.<br/>
+     * If standard proxy java properties are set, those take precedence over the okta specific properties.
+     * @param destinationCommand The command line to update
+     */
+    private void relayOktaProxyProperties(ArrayList<String> destinationCommand) {
+        final String oktaProxyHost = System.getProperty(OKTA_PROXY_HOST_PROPERTY_NAME);
+        final String oktaProxyPort = System.getProperty(OKTA_PROXY_PORT_PROPERTY_NAME);
+
+        if (oktaProxyHost != null && !oktaProxyHost.isEmpty()) {
+            for (String propertyName : PROXY_HOST_PROPS) {
+                if (System.getProperty(propertyName) == null) {
+                    destinationCommand.add("-D" + propertyName + "=" + oktaProxyHost);
+                }
+            }
+            if (oktaProxyPort != null && !oktaProxyPort.isEmpty()) {
+                for (String propertyName : PROXY_PORT_PROPS) {
+                    if (System.getProperty(propertyName) == null) {
+                        destinationCommand.add("-D" + propertyName + "=" + oktaProxyPort);
+                    }
+                }
+            }
         }
     }
 
